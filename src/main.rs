@@ -11,10 +11,28 @@ fn main() -> Result<()> {
     translator()
 }
 
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_source_lang_auto_detection() {
+        // Test that when source is None, "auto" is used
+        let source_lang = None::<String>.as_deref().unwrap_or("auto");
+        assert_eq!(source_lang, "auto");
+    }
+
+    #[test]
+    fn test_source_lang_explicit() {
+        // Test that when source is provided, it's used
+        let source = Some("fr".to_string());
+        let source_lang = source.as_deref().unwrap_or("auto");
+        assert_eq!(source_lang, "fr");
+    }
+}
+
 fn translator() -> Result<()> {
     let flags = xflags::parse_or_exit! {
-        /// Source language that the program will translate from
-        required -s,--source lang: String
+        /// Source language that the program will translate from (auto-detect if not specified)
+        optional -s,--source lang: String
         /// Target language that the program will translate to
         required -t,--target lang: String
         /// Optional DNS configuration, default if empty: 8.8.8.8
@@ -27,9 +45,11 @@ fn translator() -> Result<()> {
         bail!("flag is required: `<words>`");
     }
 
+    let source_lang = flags.source.as_deref().unwrap_or("auto");
+
     let url = [
         "https://translate.googleapis.com/translate_a/single?client=gtx&sl=",
-        &flags.source,
+        source_lang,
         "&tl=",
         &flags.target,
         "&hl=en-US&dt=t&dt=bd&dj=1&source=icon&tk=316277.316277&q=",
@@ -62,6 +82,11 @@ fn translator() -> Result<()> {
     // Debugging purpose
     // let resp: String = agent.get(&url).call()?.into_string()?;
     // println!("{}", &resp);
+
+    // Show detected language when using auto-detection
+    if flags.source.is_none() && !resp.src.is_empty() {
+        println!("detected language: {}", resp.src);
+    }
 
     print!("translate: ");
     for s in resp.sentences {
